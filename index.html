@@ -1,116 +1,12 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Click for Success - 任务完成计数器</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <div class="container">
-        <!-- 主界面 -->
-        <div id="mainScreen" class="screen">
-            <h1>Click for Success</h1>
-            <p class="subtitle">让每一次完成都闪闪发光✨</p>
-            
-            <!-- 任务输入 -->
-            <div class="input-section">
-                <input type="text" id="taskName" placeholder="输入任务名称..." maxlength="50">
-                <div class="input-row">
-                    <input type="number" id="taskSteps" placeholder="分步数量" min="1" max="100" value="10">
-                    <button id="startBtn" class="btn btn-primary">开始任务</button>
-                </div>
-            </div>
-
-            <!-- 当前任务显示 -->
-            <div id="taskDisplay" class="task-display hidden">
-                <h2 id="currentTaskName"></h2>
-                
-                <!-- 进度条 -->
-                <div class="progress-container">
-                    <div class="progress-bar">
-                        <div id="progressFill" class="progress-fill"></div>
-                    </div>
-                    <p id="progressText" class="progress-text">0/10</p>
-                </div>
-
-                <!-- 计时器 -->
-                <div class="timer-section">
-                    <div class="timer-mode">
-                        <label>
-                            <input type="radio" name="timerMode" value="forward" checked> 正向计时
-                        </label>
-                        <label>
-                            <input type="radio" name="timerMode" value="countdown"> 倒计时
-                        </label>
-                    </div>
-                    
-                    <div id="forwardTimer" class="timer-control">
-                        <p id="forwardDisplay" class="timer-display">00:00</p>
-                        <div class="timer-buttons">
-                            <button id="startTimerBtn" class="btn btn-small">开始</button>
-                            <button id="pauseTimerBtn" class="btn btn-small" disabled>暂停</button>
-                            <button id="resetTimerBtn" class="btn btn-small">重置</button>
-                        </div>
-                    </div>
-                    
-                    <div id="countdownTimer" class="timer-control hidden">
-                        <div class="countdown-input">
-                            <input type="number" id="minutes" placeholder="分钟" min="0" max="59" value="25">
-                            <span>:</span>
-                            <input type="number" id="seconds" placeholder="秒" min="0" max="59" value="00">
-                        </div>
-                        <p id="countdownDisplay" class="timer-display">25:00</p>
-                        <div class="timer-buttons">
-                            <button id="startCountdownBtn" class="btn btn-small">开始</button>
-                            <button id="pauseCountdownBtn" class="btn btn-small" disabled>暂停</button>
-                            <button id="resetCountdownBtn" class="btn btn-small">重置</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 完成按钮 -->
-                <button id="completeBtn" class="btn btn-success btn-large">✓ 完成一个</button>
-
-                <!-- 庆祝动画选择 -->
-                <div class="celebration-section">
-                    <p>选择庆祝效果：</p>
-                    <div class="celebration-options">
-                        <label>
-                            <input type="radio" name="celebration" value="fireworks" checked>
-                            🎆 烟火
-                        </label>
-                        <label>
-                            <input type="radio" name="celebration" value="balloons">
-                            🎈 气球
-                        </label>
-                        <label>
-                            <input type="radio" name="celebration" value="confetti">
-                            🎉 彩带
-                        </label>
-                    </div>
-                </div>
-
-                <!-- 操作按钮 -->
-                <div class="action-buttons">
-                    <button id="historyBtn" class="btn btn-secondary">查看历史</button>
-                    <button id="resetTaskBtn" class="btn btn-secondary">重置任务</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 历史记录界面 -->
-        <div id="historyScreen" class="screen hidden">
-            <h2>任务历史</h2>
-            <div id="historyList" class="history-list"></div>
-            <button id="backBtn" class="btn btn-secondary">返回</button>
-            <button id="clearHistoryBtn" class="btn btn-danger">清空历史</button>
-        </div>
-    </div>
-
-    <!-- 庆祝动画容器 -->
-    <div id="celebrationContainer" class="celebration-container"></div>
-
-    <script src="script.js"></script>
-</body>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Click for Success</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
