@@ -6,6 +6,7 @@ import HistoryPanel from './components/HistoryPanel'
 import { playCelebration } from './celebrations/index'
 
 const STORAGE_KEY = 'cfs_history_v1'
+const HISTORY_MAX = 50
 
 export default function App(){
   const [task, setTask] = useState({
@@ -41,7 +42,7 @@ export default function App(){
           const p = Math.min(t.sections, t.progress+1)
           const status = p === t.sections ? 'completed' : t.status
           if(status === 'completed'){
-            // finalize and push to history
+            // finalize and push to history (only when completed)
             const entry = {
               id: 'task-'+Date.now(),
               title: t.title,
@@ -50,27 +51,28 @@ export default function App(){
               completedAt: new Date().toISOString(),
               celebration: t.celebration || lockedCelebration.current
             }
-            setHistory(h => [entry, ...h])
+            setHistory(h => {
+              const next = [entry, ...h].slice(0, HISTORY_MAX)
+              return next
+            })
             playCelebration(t.celebration || lockedCelebration.current)
           }
           return {...t, progress: p, status}
         })
       }
-      if(k.toLowerCase() === 'c'){ // CL -> generate task
+      if(k.toLowerCase() === 'c'){ // CL -> generate task (do not write preview into history)
         setTask(t => ({...t, id: t.id||'task-'+Date.now(), status: 'generated'}))
-        // store creation timestamp in history preview (without marking completed)
-        setHistory(h => [{id:'task-'+Date.now(), title: task.title || 'Untitled', sections: task.sections, createdAt: new Date().toISOString(), completedAt: '', celebration: task.celebration||lockedCelebration.current}, ...h])
       }
       if(k === '?') setShowHistory(s=>!s)
     }
     window.addEventListener('keydown', onKey)
     return ()=> window.removeEventListener('keydown', onKey)
-  },[task, history])
+  },[task])
 
   function updateTask(up){ setTask(t => ({...t, ...up})) }
   function onGenerate(){
     setTask(t => ({...t, id: t.id||'task-'+Date.now(), status: 'generated'}))
-    setHistory(h => [{id:'task-'+Date.now(), title: task.title || 'Untitled', sections: task.sections, createdAt: new Date().toISOString(), completedAt: '', celebration: task.celebration||lockedCelebration.current}, ...h])
+    // do not write a preview entry to history here; history only stores completed tasks
   }
   function onResetTask(){ setTask({id:null,title:'',sections:10,progress:0,status:'idle',celebration:null}); lockedCelebration.current = null }
   function onSelectHistoryItem(item){
