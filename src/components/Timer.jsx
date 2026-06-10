@@ -1,34 +1,59 @@
-import React, {useState, useEffect, useRef} from 'react'
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { playSound } from '../sounds'
 
-export default function Timer(){
-  const [mode,setMode] = useState('countup')
-  const [running,setRunning] = useState(false)
-  const [time,setTime] = useState(0)
-  const ref = useRef(null)
+const Timer = forwardRef(function Timer({ mode, running, onRunningChange, onReset }, ref) {
+  const [time, setTime] = useState(0)
+  const intervalRef = useRef(null)
 
-  useEffect(()=>{
-    if(running){
-      ref.current = setInterval(()=> setTime(t=>t+1), 1000)
-    } else {
-      clearInterval(ref.current)
+  useEffect(() => {
+    if (!running) {
+      clearInterval(intervalRef.current)
+      return undefined
     }
-    return ()=> clearInterval(ref.current)
-  },[running])
 
-  function start(){ setRunning(true) }
-  function pause(){ setRunning(false) }
-  function reset(){ setRunning(false); setTime(0) }
+    intervalRef.current = setInterval(() => {
+      setTime(current => {
+        if (mode === 'up') return current + 1
+
+        if (current <= 1) {
+          onRunningChange(false)
+          playSound('timeover')
+          return 0
+        }
+
+        return current - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(intervalRef.current)
+  }, [mode, onRunningChange, running])
+
+  useImperativeHandle(ref, () => ({
+    addTenMinutes: () => setTime(current => current + 600),
+    subOneMinute: () => setTime(current => Math.max(0, current - 60)),
+    start: () => {
+      if (mode === 'down' && time <= 0) {
+        alert('请先增加时间再开始倒计时')
+        return false
+      }
+
+      onRunningChange(true)
+      return true
+    },
+    reset: () => {
+      onRunningChange(false)
+      setTime(0)
+      onReset?.()
+    }
+  }), [mode, onReset, onRunningChange, time])
 
   return (
     <div className="timer">
-      <div className="time-display">{new Date(time*1000).toISOString().substr(11,8)}</div>
-      <div className="timer-controls">
-        <button onClick={()=>setTime(t=>t+60)}>Q+</button>
-        <button onClick={()=>setTime(t=>Math.max(0,t-60))}>W-</button>
-        <button onClick={start}>E</button>
-        <button onClick={pause}>R</button>
-        <button onClick={reset}>T</button>
+      <div className="time-display">
+        {new Date(time * 1000).toISOString().substr(11, 8)}
       </div>
     </div>
   )
-}
+})
+
+export default Timer
