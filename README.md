@@ -1,16 +1,43 @@
-# Click-for-Success
+# Click for Success
 
-This is a small React + Vite prototype for the "Click for Success" printer-style task/ timer app.
+A small desktop focus timer app built with React, Vite, and Electron.
 
-Run locally:
+## Download
 
-1. npm install
-2. npm run dev
+For Windows users who just want to use the app, download the latest `.exe` from the
+[Releases](https://github.com/dulceluna93/click-for-success/releases) page.
 
-Keyboard notes:
-- 1 / 2 : decrease / increase sections
-- 0 / - / = : select fireworks / balloons / confetti (locked state)
-- Space: complete one section (when generated)
-- C: generate task (CL)
-- ?: toggle history view
+- `Click for Success Setup 0.1.0.exe`: installer version
+- `Click for Success 0.1.0.exe`: portable version
+
+## Run From Source
+
+```bash
+npm install
+npm run dev
+```
+
+## Build
+
+Build the web app:
+
+```bash
+npm run build
+```
+
+Build the Windows desktop app:
+
+```bash
+npm run dist:win
+```
+
+The generated Windows files are written to `release/`.
+
+## Keyboard Notes
+
+- `1` / `2`: decrease / increase sections
+- `0` / `-` / `=`: select fireworks / balloons / confetti
+- `Space`: complete one section
+- `C`: generate task
+- `?`: toggle history view
 
