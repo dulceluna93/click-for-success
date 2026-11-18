@@ -3,6 +3,8 @@ name: Build macOS package
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -28,7 +30,18 @@ jobs:
       - name: Build universal DMG
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-        run: npm run dist:mac
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run dist:mac 2>&1 | tee mac-build.log || {
+            {
+              echo "## macOS build failure log"
+              echo '```text'
+              tail -n 120 mac-build.log
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          }
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
