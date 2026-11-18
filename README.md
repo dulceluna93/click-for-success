@@ -1,14 +1,17 @@
 # Click for Success
 
-一款打字机造型的 Windows 桌面任务完成器。将任务划分成若干份，每完成一份按一次空格键，通过机械按键、计时器、声音和庆祝效果获得直观的进度反馈。
+一款打字机造型的桌面任务完成器，提供 Windows 和 macOS 版本。将任务划分成若干份，每完成一份按一次空格键，通过机械按键、计时器、声音和庆祝效果获得直观的进度反馈。
 
 项目使用 React、Vite 和 Electron 开发。
 
 ## 下载
 
-- [Windows 安装版](https://github.com/dulceluna93/click-for-success/releases/latest/download/Click%20for%20Success%20Setup%202.0.0.exe)
-- [Windows 便携版](https://github.com/dulceluna93/click-for-success/releases/latest/download/Click%20for%20Success%202.0.0.exe)
-- [查看所有版本与 macOS 下载](https://github.com/dulceluna93/click-for-success/releases/latest)
+- [Windows 安装版 v2.0.0](https://github.com/dulceluna93/click-for-success/releases/download/v2.0.0/Click.for.Success.Setup.2.0.0.exe)
+- [Windows 便携版 v2.0.0](https://github.com/dulceluna93/click-for-success/releases/download/v2.0.0/Click.for.Success.2.0.0.exe)
+- [macOS 通用版 v2.0.0](https://github.com/dulceluna93/click-for-success/releases/download/v2.0.0/Click.for.Success-2.0.0-mac-universal.dmg)（Intel 和 Apple Silicon）
+- [查看最新发布说明](https://github.com/dulceluna93/click-for-success/releases/latest) · [查看所有版本](https://github.com/dulceluna93/click-for-success/releases)
+
+macOS 版本由 GitHub Actions 构建，尚未在真实 Mac 上测试，也未进行 Apple 代码签名或公证。
 
 ## 2.0 主要功能
 
