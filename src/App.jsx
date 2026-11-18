@@ -8,21 +8,51 @@ import { playSound, setSoundVolume } from './sounds'
 const STORAGE_KEY = 'cfs_history_v1'
 const EMOJI_CONFETTI_KEY = 'cfs_emoji_confetti_v1'
 const SOUND_VOLUME_KEY = 'cfs_sound_volume_v1'
+const CELEBRATION_KEY = 'cfs_celebration_v1'
+const TIMER_MODE_KEY = 'cfs_timer_mode_v1'
 const HISTORY_MAX = 50
 const DEFAULT_EMOJI_CONFETTI = ['\u2B50', '\u2728']
+const DEFAULT_CELEBRATION = 'emojiConfetti'
+const DEFAULT_TIMER_MODE = 'up'
 const STAGE_WIDTH = 1060
 const STAGE_HEIGHT = 760
+const STAGE_MARGIN = 8
+const MIN_STAGE_SCALE = 0.16
+const MIN_WINDOW_WIDTH = 180
+const MIN_WINDOW_HEIGHT = 135
+const RESIZE_EDGES = [
+  'top',
+  'right',
+  'bottom',
+  'left',
+  'top-left',
+  'top-right',
+  'bottom-right',
+  'bottom-left'
+]
+
+function loadCelebrationPreference() {
+  const saved = localStorage.getItem(CELEBRATION_KEY)
+  return saved === 'confetti' || saved === 'emojiConfetti' ? saved : DEFAULT_CELEBRATION
+}
+
+function loadTimerModePreference() {
+  const saved = localStorage.getItem(TIMER_MODE_KEY)
+  return saved === 'down' || saved === 'up' ? saved : DEFAULT_TIMER_MODE
+}
 
 export default function App() {
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
-  const [task, setTask] = useState({
+  const [preferredCelebration, setPreferredCelebration] = useState(loadCelebrationPreference)
+  const [task, setTask] = useState(() => ({
     id: null,
     title: '',
     sections: 10,
     progress: 0,
     status: 'idle',
-    celebration: null
-  })
+    celebration: loadCelebrationPreference(),
+    createdAt: null
+  }))
   const [history, setHistory] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []
@@ -35,6 +65,7 @@ export default function App() {
   const [showManual, setShowManual] = useState(false)
   const [showVolumeSettings, setShowVolumeSettings] = useState(false)
   const [showCelebrationRequired, setShowCelebrationRequired] = useState(false)
+  const [showKeyHints, setShowKeyHints] = useState(false)
   const [emojiConfettiFillers, setEmojiConfettiFillers] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(EMOJI_CONFETTI_KEY)) || DEFAULT_EMOJI_CONFETTI
@@ -42,13 +73,13 @@ export default function App() {
       return DEFAULT_EMOJI_CONFETTI
     }
   })
-  const lockedCelebration = useRef(null)
+  const lockedCelebration = useRef(preferredCelebration)
   const recordedCompletions = useRef(new Set())
   const timerRef = useRef(null)
   const generateTimeoutRef = useRef(null)
   const isMousePassthrough = useRef(false)
   const isWindowResizing = useRef(false)
-  const [timerMode, setTimerMode] = useState('up')
+  const [timerMode, setTimerMode] = useState(loadTimerModePreference)
   const [timerRunning, setTimerRunning] = useState(false)
   const [compactMode, setCompactMode] = useState(false)
   const [soundVolume, setSoundVolumeState] = useState(() => {
@@ -76,8 +107,20 @@ export default function App() {
       const deltaY = moveEvent.screenY - startY
       const nextBounds = { ...startBounds }
 
-      if (edge.includes('right')) nextBounds.width = startBounds.width + deltaX
-      if (edge.includes('bottom')) nextBounds.height = startBounds.height + deltaY
+      if (edge.includes('right')) {
+        nextBounds.width = Math.max(MIN_WINDOW_WIDTH, startBounds.width + deltaX)
+      }
+      if (edge.includes('bottom')) {
+        nextBounds.height = Math.max(MIN_WINDOW_HEIGHT, startBounds.height + deltaY)
+      }
+      if (edge.includes('left')) {
+        nextBounds.width = Math.max(MIN_WINDOW_WIDTH, startBounds.width - deltaX)
+        nextBounds.x = startBounds.x + startBounds.width - nextBounds.width
+      }
+      if (edge.includes('top')) {
+        nextBounds.height = Math.max(MIN_WINDOW_HEIGHT, startBounds.height - deltaY)
+        nextBounds.y = startBounds.y + startBounds.height - nextBounds.height
+      }
 
       desktop.setWindowBounds(nextBounds)
     }
@@ -112,7 +155,8 @@ export default function App() {
       '.right-knob',
       '.paper-bail',
       '.desktop-note-controls',
-      '.base-bottom-drag-area'
+      '.base-bottom-drag-area',
+      '.window-resize-handle'
     ].join(',')
 
     function setPassthrough(nextValue) {
@@ -147,11 +191,11 @@ export default function App() {
     function updateStageScale() {
       const scale = Math.min(
         1.5,
-        (window.innerWidth - 24) / STAGE_WIDTH,
-        (window.innerHeight - 24) / STAGE_HEIGHT
+        (window.innerWidth - STAGE_MARGIN) / STAGE_WIDTH,
+        (window.innerHeight - STAGE_MARGIN) / STAGE_HEIGHT
       )
 
-      document.documentElement.style.setProperty('--stage-scale', Math.max(0.5, scale).toString())
+      document.documentElement.style.setProperty('--stage-scale', Math.max(MIN_STAGE_SCALE, scale).toString())
     }
 
     updateStageScale()
@@ -173,18 +217,30 @@ export default function App() {
   }, [soundVolume])
 
   useEffect(() => {
+    localStorage.setItem(CELEBRATION_KEY, preferredCelebration)
+  }, [preferredCelebration])
+
+  useEffect(() => {
+    localStorage.setItem(TIMER_MODE_KEY, timerMode)
+  }, [timerMode])
+
+  useEffect(() => {
     if (task.status !== 'completed' || !task.id) return
     if (recordedCompletions.current.has(task.id)) return
 
     recordedCompletions.current.add(task.id)
 
-    const now = new Date().toLocaleString()
+    const completedAt = new Date()
+    const createdAt = task.createdAt ? new Date(task.createdAt) : null
     const entry = {
       id: task.id,
       title: task.title,
       sections: task.sections,
-      createdAt: now,
-      completedAt: now,
+      createdAt: createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toISOString() : completedAt.toISOString(),
+      completedAt: completedAt.toISOString(),
+      durationMs: createdAt && !Number.isNaN(createdAt.getTime())
+        ? Math.max(0, completedAt.getTime() - createdAt.getTime())
+        : null,
       celebration: task.celebration || lockedCelebration.current
     }
 
@@ -199,11 +255,14 @@ export default function App() {
         .then(() => playSound('celebrate'))
         .then(() => playCelebration(effect, { emojis: emojiConfettiFillers }))
     }
-  }, [task.status, task.id, task.title, task.sections, task.celebration, emojiConfettiFillers])
+  }, [task.status, task.id, task.title, task.sections, task.celebration, task.createdAt, emojiConfettiFillers])
 
   function updateTask(up) {
     setTask(t => {
-      const newTask = { ...t, ...up }
+      const allowedUpdate = { ...up }
+      if (t.status !== 'idle') delete allowedUpdate.sections
+
+      const newTask = { ...t, ...allowedUpdate }
       if (newTask.progress >= newTask.sections && t.status !== 'completed' && newTask.status === 'generated') {
         newTask.status = 'completed'
       }
@@ -213,6 +272,7 @@ export default function App() {
 
   function selectCelebration(celebration) {
     lockedCelebration.current = celebration
+    setPreferredCelebration(celebration)
     setShowEmojiSettings(false)
     setShowHistory(false)
     setShowManual(false)
@@ -243,6 +303,8 @@ export default function App() {
   }
 
   function onGenerate() {
+    if (task.status !== 'idle') return
+
     if (!task.celebration && !lockedCelebration.current) {
       setShowEmojiSettings(false)
       setShowHistory(false)
@@ -257,19 +319,24 @@ export default function App() {
 
     clearTimeout(generateTimeoutRef.current)
     generateTimeoutRef.current = setTimeout(() => {
-      setTask(t => ({ ...t, id: t.id || 'task-' + Date.now(), status: 'generated' }))
+      setTask(t => ({
+        ...t,
+        id: t.id || 'task-' + Date.now(),
+        status: 'generated',
+        createdAt: t.createdAt || new Date().toISOString()
+      }))
     }, 500)
   }
 
   function onResetTask() {
     clearTimeout(generateTimeoutRef.current)
-    setTask({ id: null, title: '', sections: 10, progress: 0, status: 'idle', celebration: null })
+    setTask({ id: null, title: '', sections: 10, progress: 0, status: 'idle', celebration: preferredCelebration, createdAt: null })
     setShowEmojiSettings(false)
     setShowHistory(false)
     setShowManual(false)
     setShowVolumeSettings(false)
     setShowCelebrationRequired(false)
-    lockedCelebration.current = null
+    lockedCelebration.current = preferredCelebration
   }
 
   function onSaveEmojiConfetti(nextEmojis) {
@@ -308,9 +375,65 @@ export default function App() {
     desktop.toggleAlwaysOnTop().then(setAlwaysOnTop)
   }
 
+  function formatHistoryDate(value) {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return String(value || '时间未记录').replace(/:\d{2}(?=\s|$)/, '')
+
+    const pad = number => String(number).padStart(2, '0')
+    return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
+
+  function formatHistoryDuration(durationMs) {
+    if (!Number.isFinite(durationMs)) return '未记录'
+
+    const totalMinutes = Math.floor(durationMs / 60000)
+    if (totalMinutes < 1) return '不足1分钟'
+
+    const days = Math.floor(totalMinutes / 1440)
+    const hours = Math.floor((totalMinutes % 1440) / 60)
+    const minutes = totalMinutes % 60
+    return [
+      days ? `${days}天` : '',
+      hours ? `${hours}小时` : '',
+      minutes ? `${minutes}分钟` : ''
+    ].filter(Boolean).join('')
+  }
+
+  async function exportHistory() {
+    const content = history.map(item => [
+      `${item.title || '无题任务'} ${item.sections ?? '-'}`,
+      formatHistoryDate(item.createdAt),
+      `用时 ${formatHistoryDuration(item.durationMs)}`
+    ].join('\r\n')).join('\r\n\r\n')
+    const now = new Date()
+    const pad = number => String(number).padStart(2, '0')
+    const fileName = `Click-for-Success-完成记录-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.txt`
+    const payload = { content: `\uFEFF${content}`, fileName }
+
+    if (window.cfsDesktop?.exportHistory) {
+      await window.cfsDesktop.exportHistory(payload)
+      return
+    }
+
+    const url = URL.createObjectURL(new Blob([payload.content], { type: 'text/plain;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = fileName
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 0)
+  }
+
   return (
     <div className="app-root">
-      <div className={`printer ${compactMode ? 'printer-compact' : ''}`}>
+      {window.cfsDesktop && RESIZE_EDGES.map(edge => (
+        <div
+          key={edge}
+          className={`window-resize-handle window-resize-${edge}`}
+          aria-hidden="true"
+          onMouseDown={(event) => startWindowResize(edge, event)}
+        />
+      ))}
+      <div className={`printer ${compactMode ? 'printer-compact' : ''} ${showKeyHints ? 'printer-key-hints' : ''}`}>
         <div className="rear-backplate" aria-hidden="true" />
         <div className="gold-arch gold-arch-left" aria-hidden="true" />
         <div className="gold-arch gold-arch-right" aria-hidden="true" />
@@ -330,6 +453,12 @@ export default function App() {
           onKeyDown={suppressButtonKeyboard}
           onClick={onToggleTimerKnob}
         />
+        {showKeyHints && (
+          <>
+            <span className="mechanical-control-hint drawer-control-hint">抽屉模式</span>
+            <span className="mechanical-control-hint timer-control-hint">计时器开关</span>
+          </>
+        )}
         <div className="paper-bail" aria-hidden="true">
           <span className="paper-bail-block paper-bail-block-left" />
           <span className="paper-bail-block paper-bail-block-right" />
@@ -347,6 +476,9 @@ export default function App() {
           onUpdate={updateTask}
           onSaveEmojiConfetti={onSaveEmojiConfetti}
           onChangeSoundVolume={setSoundVolumeState}
+          onExportHistory={exportHistory}
+          formatHistoryDate={formatHistoryDate}
+          formatHistoryDuration={formatHistoryDuration}
         />
         <div className="body">
           <div className="logo">ClickforSuccess</div>
@@ -356,12 +488,21 @@ export default function App() {
               mode={timerMode}
               running={timerRunning}
               onRunningChange={setTimerRunning}
-              onReset={() => setTimerMode('up')}
             />
           </div>
         </div>
 
         <div className="desktop-note-controls" aria-label="窗口控制">
+          <button
+            type="button"
+            className={`desktop-note-button desktop-note-help ${showKeyHints ? 'active' : ''}`}
+            onClick={() => setShowKeyHints(value => !value)}
+            onKeyDown={suppressButtonKeyboard}
+            title="按键提示"
+            aria-pressed={showKeyHints}
+          >
+            ?
+          </button>
           <button
             type="button"
             className={`desktop-note-button desktop-note-pin ${alwaysOnTop ? 'active' : ''}`}
@@ -405,6 +546,7 @@ export default function App() {
           </div>
           <Keyboard
             compactMode={compactMode}
+            showKeyHints={showKeyHints}
             task={task}
             onUpdate={updateTask}
             onGenerate={onGenerate}

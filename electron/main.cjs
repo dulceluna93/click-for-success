@@ -1,4 +1,5 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain } = require('electron')
+const fs = require('fs/promises')
 const path = require('path')
 
 let mainWindow = null
@@ -7,8 +8,8 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1050,
     height: 594,
-    minWidth: 320,
-    minHeight: 260,
+    minWidth: 180,
+    minHeight: 135,
     transparent: true,
     frame: false,
     resizable: true,
@@ -82,4 +83,18 @@ ipcMain.handle('desktop:set-window-bounds', (_event, nextBounds) => {
 
   mainWindow.setBounds(bounds)
   return mainWindow.getBounds()
+})
+
+ipcMain.handle('desktop:export-history', async (_event, payload) => {
+  if (!mainWindow || typeof payload?.content !== 'string') return false
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: '导出完成记录',
+    defaultPath: payload.fileName || 'Click-for-Success-完成记录.txt',
+    filters: [{ name: '文本文件', extensions: ['txt'] }]
+  })
+
+  if (result.canceled || !result.filePath) return false
+  await fs.writeFile(result.filePath, payload.content, 'utf8')
+  return true
 })

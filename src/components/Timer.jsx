@@ -1,7 +1,7 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { playSound } from '../sounds'
 
-const Timer = forwardRef(function Timer({ mode, running, onRunningChange, onReset }, ref) {
+const Timer = forwardRef(function Timer({ mode, running, onRunningChange }, ref) {
   const [time, setTime] = useState(0)
   const intervalRef = useRef(null)
 
@@ -43,9 +43,8 @@ const Timer = forwardRef(function Timer({ mode, running, onRunningChange, onRese
     reset: () => {
       onRunningChange(false)
       setTime(0)
-      onReset?.()
     }
-  }), [mode, onReset, onRunningChange, time])
+  }), [mode, onRunningChange, time])
 
   return (
     <div className="timer">

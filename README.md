@@ -1,195 +1,135 @@
-# 🎯 Click for Success
+# Click for Success
 
-A typewriter-style **task reward desktop companion** — celebrate every completion!
+一款打字机造型的 Windows 桌面任务完成器。将任务划分成若干份，每完成一份按一次空格键，通过机械按键、计时器、声音和庆祝效果获得直观的进度反馈。
 
-## 💡 Key Features
+项目使用 React、Vite 和 Electron 开发。
 
-Through instant feedback and multi-sensory rewards, we motivate you to keep completing tasks:
+## 2.0 主要功能
 
-- 🎮 **Typewriter-style Interaction**: Press spacebar to see progress accumulate and hear reward sounds
-- 🎨 **Visual Rewards**: Celebrate task completion with emoji fireworks and confetti animations
-- ⏱️ **Flexible Timer**: Forward timer (time awareness) and countdown timer (Pomodoro mode)
-- 🐾 **Desktop Companion Mode**: Minimize to the corner and let it accompany your work and study
-- ⚡ **Effortless Task Setup**: Just enter a task name and number — no complex step planning needed
+- 桌宠式透明窗口，可拖动、置顶并从四边或四角缩放。
+- 窗口可缩小至 `180 x 135`，打字机会随窗口完整等比缩放。
+- 透明区域支持鼠标穿透，减少对其他窗口的遮挡。
+- 可输入任务名称并设置任务划分数量；任务生成后数量自动锁定。
+- 正计时、倒计时、音量控制、按键音和完成庆祝效果。
+- 庆祝方式及计时模式会记住上次选择。
+- 抽屉模式可收起三排键盘，保留主要操作按键。
+- 按键提示模式会显示各功能键的简短中文说明。
+- 电脑键盘映射带有同步的键帽按下动画。
+- 完成记录包含任务名称、划分数量、创建时间和完成总用时。
+- 历史记录可导出为 UTF-8 TXT 文件。
 
-## 🚀 Quick Start
+## 基本使用
 
-### Download & Use
+1. 在纸张中输入任务名称。
+2. 使用 `1`、`2` 调整划分数量，或直接点击进度总数输入数字。
+3. 使用 `-` 或 `+` 选择庆祝方式。
+4. 点击 `CL` 生成任务。映射模式开启时，也可在任务名称输入框按 `Enter`。
+5. 每完成一份任务，点击 `Space`，进度增加 1。
+6. 达到总数后，应用播放完成反馈并自动写入历史记录。
+7. 点击 `SET` 重置任务并开始下一项。
 
-Windows users can download the latest version from the [Releases](https://github.com/dulceluna93/click-for-success/releases) page:
+任务生成后，划分数量不能再修改；`1`、`2` 仍保留按键动画，但不会改变数据。
 
-- `Click for Success Setup 0.1.0.exe` - Installer version
-- `Click for Success 0.1.0.exe` - Portable version
+## 打字机按键
 
-### Run From Source
+| 按键 | 功能 | 映射模式下的电脑按键 |
+| --- | --- | --- |
+| `1` | 划分数量 +1 | `1` |
+| `2` | 划分数量 -1 | `2` |
+| `0` | 设置礼花中的表情 | `0` |
+| `-` | 选择礼花庆祝 | `-` |
+| `+` | 选择彩带庆祝 | `=` / `+` |
+| `U` | 计时器增加 10 分钟 | `U` |
+| `I` | 计时器减少 1 分钟 | `I` |
+| `O` | 选择正计时 | `O` |
+| `P` | 选择倒计时 | `P` |
+| `Z` | 开关电脑键盘映射 | `Z`（关闭映射） |
+| `,` | 音量设置 | `,` |
+| `.` | 内置说明书 | `.` |
+| `/` | 历史记录 | `/` |
+| `Space` | 当前任务进度 +1 | `Space` |
+| `CL` | 生成任务 | `Enter` |
+| `SET` | 重置任务 | 左或右 `Shift` |
+
+电脑键盘映射需要先点击虚拟 `Z` 开启。开启后，打字机上存在的数字、字母、符号和空格都会同步显示按下与松开效果；没有功能的按键只播放机械按压效果。
+
+在任务名称、表情或数字输入框中输入时，映射按键只显示视觉效果，不执行功能。任务名称输入框中的 `Enter` 是例外，可直接生成任务；输入法正在选词时不会触发生成。
+
+## 机械控制与窗口
+
+- 左上角圆盘：切换抽屉模式。
+- 右上方机械开关：开始计时；计时运行中再次点击会归零。
+- `?` 便签：显示或隐藏中文按键提示。
+- `Pin`：切换窗口置顶。
+- `Min`：最小化窗口。
+- `X`：关闭窗口。
+- 打字机的非交互表面可用于拖动窗口。
+- 窗口四边和四角均可调整尺寸。
+
+## 历史记录与导出
+
+点击 `/` 查看完成记录。每条记录的格式为：
+
+```text
+写作业 6
+2026/11/17 18:49
+用时 2小时47分钟
+```
+
+历史时间精确到分钟。旧版本记录如果缺少真实开始时间，会显示“用时 未记录”。
+
+点击 `HISTORY` 标题旁的下载图标，确认后即可导出完成记录：
+
+- 浏览器预览会直接下载 TXT。
+- Electron 桌面版会打开系统“另存为”窗口。
+- 文件采用带 BOM 的 UTF-8 编码，便于 Windows 记事本正确显示中文。
+
+## 本地数据
+
+历史记录、音量、庆祝方式、礼花表情和计时模式保存在应用本地。键盘映射模式不会持久化，刷新或重新启动后默认关闭。
+
+## 从源码运行
+
+安装依赖：
 
 ```bash
 npm install
+```
+
+启动浏览器开发预览：
+
+```bash
 npm run dev
 ```
 
-### Build
-
-Build the web app:
+构建 Web 资源：
 
 ```bash
 npm run build
 ```
 
-Build the Windows desktop app:
+构建并启动 Electron 桌面版：
+
+```bash
+npm run desktop
+```
+
+生成 Windows 安装版和便携版：
 
 ```bash
 npm run dist:win
 ```
 
-Generated files are in the `release/` directory.
-
-## ⌨️ Keyboard Shortcuts
-
-### Task Functions
-
-| Key | Function |
-|-----|----------|
-| Type | Enter task name |
-| `1` | Decrease progress sections |
-| `2` | Increase progress sections |
-| `0` | Set fireworks emoji |
-| `-` | Fireworks celebration |
-| `+` | Confetti celebration |
-| `C` | Create task |
-| `S` | Reset task |
-| `Space` | Complete progress +1 |
-
-### Timer Functions
-
-| Key | Function |
-|-----|----------|
-| `U` | Add 10 minutes |
-| `I` | Decrease 1 minute |
-| `O` | Forward timer mode |
-| `P` | Countdown timer mode |
-| Top-right button | Timer on/off |
-
-### Other Functions
-
-| Key | Function |
-|-----|----------|
-| `,` | Volume settings |
-| `.` | Instructions |
-| `/` | History |
-| Top-left dial | Retract keyboard |
-
-## 🛠️ Tech Stack
-
-- **React** - UI Framework
-- **Vite** - Build Tool
-- **Electron** - Desktop Application Framework
-- **JavaScript** - Core Logic
-- **CSS** - Styling
-
-## 📝 License
-
-MIT
-
----
-
-**Made with ❤️ to help you succeed, one click at a time!**
-
----
-
-# 🎯 Click for Success
-
-一个打字机样式的**任务奖励桌宠**，每一次完成都值得庆祝！
-
-## 💡 核心特性
-
-**Click for Success** 通过即时反馈和多感官奖励，激励你持续完成任务：
-
-- 🎮 **打字机式交互**：点击空格键就能看到进度累计，听到奖励音效
-- 🎨 **视觉奖励**：最终完成任务有emoji礼花和彩带两种庆祝动画
-- ⏱️ **灵活计时**：支持正计时（感知时间流速）和倒计时（番茄钟模式）
-- 🐾 **桌宠模式**：可缩小放至右下角，陪伴你工作和学习
-- ⚡ **零思考任务设置**：只需输入任务名称和任意数字，无需复杂步骤划分
-
-## 🚀 快速开始
-
-### 下载使用
-
-Windows 用户可直接从 [Releases](https://github.com/dulceluna93/click-for-success/releases) 页面下载最新版本：
-
-- `Click for Success Setup 0.1.0.exe` - 安装版
-- `Click for Success 0.1.0.exe` - 便携版
-
-### 从源码运行
+在 macOS 上生成同时支持 Intel 与 Apple Silicon 的 Universal DMG：
 
 ```bash
-npm install
-npm run dev
+npm run dist:mac
 ```
 
-### 构建
+也可以在 GitHub Actions 中手动运行 `Build macOS package` 工作流。未配置 Apple Developer 证书时，DMG 不会进行 Apple 代码签名或公证。
 
-构建 Web 应用：
+生成文件位于 `release/`。
 
-```bash
-npm run build
-```
+## 下载
 
-构建 Windows 桌面应用：
-
-```bash
-npm run dist:win
-```
-
-生成的文件位于 `release/` 目录。
-
-## ⌨️ 快捷键说明
-
-### 任务功能
-
-| 按键 | 功能 |
-|------|------|
-| 直接输入 | 输入任务名称 |
-| `1` | 减少任务进度划分 |
-| `2` | 增加任务进度划分 |
-| `0` | 礼花内的表情设置 |
-| `-` | 礼花庆祝 |
-| `+` | 彩带庆祝 |
-| `C` | 生成任务 |
-| `S` | 重置任务 |
-| `Space` | 完成进度 +1 |
-
-### 计时器功能
-
-| 按键 | 功能 |
-|------|------|
-| `U` | 增加 10 分钟 |
-| `I` | 减少 1 分钟 |
-| `O` | 正计时模式 |
-| `P` | 倒计时模式 |
-| 右上方按键 | 计时器开/关 |
-
-### 其他功能
-
-| 按键 | 功能 |
-|------|------|
-| `,` | 音量设置 |
-| `.` | 说明书 |
-| `/` | 历史记录 |
-| 左上角圆盘 | 收起键盘 |
-
-## 🛠️ 技术栈
-
-- **React** - UI 框架
-- **Vite** - 构建工具
-- **Electron** - 桌面应用框架
-- **JavaScript** - 核心逻辑
-- **CSS** - 样式设计
-
-## 📝 许可证
-
-MIT
-
----
-
-**用❤️制作，助你每一次点击都成功！**
+Windows 安装包和便携版可从项目的 [Releases](https://github.com/dulceluna93/click-for-success/releases) 页面下载。
