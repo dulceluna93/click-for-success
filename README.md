@@ -4,6 +4,12 @@
 
 项目使用 React、Vite 和 Electron 开发。
 
+## 下载
+
+- [Windows 安装版](https://github.com/dulceluna93/click-for-success/releases/latest/download/Click%20for%20Success%20Setup%202.0.0.exe)
+- [Windows 便携版](https://github.com/dulceluna93/click-for-success/releases/latest/download/Click%20for%20Success%202.0.0.exe)
+- [查看所有版本与 macOS 下载](https://github.com/dulceluna93/click-for-success/releases/latest)
+
 ## 2.0 主要功能
 
 - 桌宠式透明窗口，可拖动、置顶并从四边或四角缩放。
@@ -130,6 +136,3 @@ npm run dist:mac
 
 生成文件位于 `release/`。
 
-## 下载
-
-Windows 安装包和便携版可从项目的 [Releases](https://github.com/dulceluna93/click-for-success/releases) 页面下载。
