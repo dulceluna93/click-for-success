@@ -6,6 +6,13 @@ on:
       - main
     paths:
       - ".github/workflows/publish-v2.yml"
+      - "src/**"
+      - "electron/**"
+      - "package.json"
+      - "package-lock.json"
+      - "index.html"
+      - "vite.config.mjs"
+      - "build/**"
 
 permissions:
   contents: write
