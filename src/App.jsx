@@ -4,13 +4,18 @@ import Keyboard from './components/Keyboard'
 import Timer from './components/Timer'
 import { playCelebration } from './celebrations/index'
 import { playSound, setSoundVolume } from './sounds'
+import { formatStepDuration, getHistorySteps, HISTORY_LIMITS } from './history'
 
 const STORAGE_KEY = 'cfs_history_v1'
+const CURRENT_TASK_KEY = 'cfs_current_task_v1'
 const EMOJI_CONFETTI_KEY = 'cfs_emoji_confetti_v1'
 const SOUND_VOLUME_KEY = 'cfs_sound_volume_v1'
 const CELEBRATION_KEY = 'cfs_celebration_v1'
 const TIMER_MODE_KEY = 'cfs_timer_mode_v1'
-const HISTORY_MAX = 50
+const POMODORO_KEY = 'cfs_pomodoro_v1'
+const DEFAULT_POMODORO = { focus: 25, break: 5, taskSections: 5, historyLimit: 200 }
+const MAX_POMODORO_MINUTES = 180
+const DEFAULT_SOUND_VOLUME = 0.6
 const DEFAULT_EMOJI_CONFETTI = ['\u2B50', '\u2728']
 const DEFAULT_CELEBRATION = 'emojiConfetti'
 const DEFAULT_TIMER_MODE = 'up'
@@ -41,30 +46,77 @@ function loadTimerModePreference() {
   return saved === 'down' || saved === 'up' ? saved : DEFAULT_TIMER_MODE
 }
 
+function validPomodoroMinutes(value) {
+  return Number.isInteger(value) && value >= 1 && value <= MAX_POMODORO_MINUTES
+}
+
+function validTaskSections(value) {
+  return Number.isSafeInteger(value) && value >= 1
+}
+
+function loadPomodoroSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(POMODORO_KEY))
+    return {
+      focus: validPomodoroMinutes(saved?.focus) ? saved.focus : DEFAULT_POMODORO.focus,
+      break: validPomodoroMinutes(saved?.break) ? saved.break : DEFAULT_POMODORO.break,
+      taskSections: validTaskSections(saved?.taskSections) ? saved.taskSections : DEFAULT_POMODORO.taskSections,
+      historyLimit: HISTORY_LIMITS.includes(saved?.historyLimit) ? saved.historyLimit : DEFAULT_POMODORO.historyLimit
+    }
+  } catch {
+    return DEFAULT_POMODORO
+  }
+}
+
+function createIdleTask(sections, celebration) {
+  return {
+    id: null,
+    title: '',
+    sections,
+    progress: 0,
+    status: 'idle',
+    celebration,
+    createdAt: null,
+    stepCompletedAtMs: []
+  }
+}
+
+function loadCurrentTask(sections, celebration) {
+  const defaultTask = createIdleTask(sections, celebration)
+  try {
+    const saved = JSON.parse(localStorage.getItem(CURRENT_TASK_KEY))
+    if (typeof saved?.title !== 'string' || !validTaskSections(saved.sections)) return defaultTask
+    if (saved.status === 'idle') return { ...defaultTask, title: saved.title, sections: saved.sections }
+    if (saved.status !== 'generated' && saved.status !== 'completed') return defaultTask
+    if (typeof saved.id !== 'string' || !saved.id || !Number.isFinite(Date.parse(saved.createdAt))) return defaultTask
+    if (!Number.isSafeInteger(saved.progress) || saved.progress < 0 || saved.progress > saved.sections) return defaultTask
+    if ((saved.status === 'completed') !== (saved.progress === saved.sections)) return defaultTask
+    if (!Array.isArray(saved.stepCompletedAtMs) || saved.stepCompletedAtMs.length !== saved.progress ||
+        getHistorySteps(saved).length !== saved.progress) return defaultTask
+    return {
+      ...defaultTask,
+      ...saved,
+      celebration: ['confetti', 'emojiConfetti'].includes(saved.celebration) ? saved.celebration : celebration
+    }
+  } catch {
+    return defaultTask
+  }
+}
+
 export default function App() {
   const [alwaysOnTop, setAlwaysOnTop] = useState(false)
   const [preferredCelebration, setPreferredCelebration] = useState(loadCelebrationPreference)
-  const [task, setTask] = useState(() => ({
-    id: null,
-    title: '',
-    sections: 10,
-    progress: 0,
-    status: 'idle',
-    celebration: loadCelebrationPreference(),
-    createdAt: null
-  }))
+  const [pomodoroSettings, setPomodoroSettings] = useState(loadPomodoroSettings)
+  const [task, setTask] = useState(() => loadCurrentTask(pomodoroSettings.taskSections, preferredCelebration))
   const [history, setHistory] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))
+      return Array.isArray(saved) ? saved.filter(item => item && typeof item === 'object') : []
     } catch (e) {
       return []
     }
   })
-  const [showHistory, setShowHistory] = useState(false)
-  const [showEmojiSettings, setShowEmojiSettings] = useState(false)
-  const [showManual, setShowManual] = useState(false)
-  const [showVolumeSettings, setShowVolumeSettings] = useState(false)
-  const [showCelebrationRequired, setShowCelebrationRequired] = useState(false)
+  const [paperView, setPaperView] = useState(null)
   const [showKeyHints, setShowKeyHints] = useState(false)
   const [emojiConfettiFillers, setEmojiConfettiFillers] = useState(() => {
     try {
@@ -73,18 +125,28 @@ export default function App() {
       return DEFAULT_EMOJI_CONFETTI
     }
   })
-  const lockedCelebration = useRef(preferredCelebration)
-  const recordedCompletions = useRef(new Set())
+  const recordedTaskId = useRef(null)
   const timerRef = useRef(null)
   const generateTimeoutRef = useRef(null)
   const isMousePassthrough = useRef(false)
   const isWindowResizing = useRef(false)
   const [timerMode, setTimerMode] = useState(loadTimerModePreference)
-  const [timerRunning, setTimerRunning] = useState(false)
+  const [timerStatus, setTimerStatus] = useState('idle')
+  const timerActive = timerStatus !== 'idle'
+  const timerRunning = timerStatus === 'running'
+  const timerPlaybackLabel = timerRunning ? '暂停计时' : timerActive ? '继续计时' : '开始计时'
+  const [pomodoroPhase, setPomodoroPhase] = useState(null)
+  const nextPomodoroPhase = pomodoroPhase === 'focus' ? 'break' : 'focus'
+  const nextPomodoroSeconds = pomodoroSettings[nextPomodoroPhase] * 60
   const [compactMode, setCompactMode] = useState(false)
+  const [minimalMode, setMinimalMode] = useState(false)
+  const switchingMinimalMode = useRef(false)
   const [soundVolume, setSoundVolumeState] = useState(() => {
-    const saved = Number(localStorage.getItem(SOUND_VOLUME_KEY))
-    return Number.isFinite(saved) ? Math.min(1, Math.max(0, saved)) : 1
+    const stored = localStorage.getItem(SOUND_VOLUME_KEY)
+    const saved = Number(stored)
+    return stored !== null && stored.trim() !== '' && Number.isFinite(saved)
+      ? Math.min(1, Math.max(0, saved))
+      : DEFAULT_SOUND_VOLUME
   })
 
   async function startWindowResize(edge, event) {
@@ -176,13 +238,16 @@ export default function App() {
       setPassthrough(!isOverInteractiveArea)
     }
 
-    window.addEventListener('mousemove', updateMousePassthrough)
-    window.addEventListener('mouseleave', () => {
+    function handleMouseLeave() {
       if (!isWindowResizing.current) setPassthrough(true)
-    })
+    }
+
+    window.addEventListener('mousemove', updateMousePassthrough)
+    window.addEventListener('mouseleave', handleMouseLeave)
 
     return () => {
       window.removeEventListener('mousemove', updateMousePassthrough)
+      window.removeEventListener('mouseleave', handleMouseLeave)
       setPassthrough(false)
     }
   }, [])
@@ -208,6 +273,12 @@ export default function App() {
   }, [history])
 
   useEffect(() => {
+    localStorage.setItem(CURRENT_TASK_KEY, JSON.stringify(task))
+  }, [task])
+
+  useEffect(() => () => clearTimeout(generateTimeoutRef.current), [])
+
+  useEffect(() => {
     localStorage.setItem(EMOJI_CONFETTI_KEY, JSON.stringify(emojiConfettiFillers))
   }, [emojiConfettiFillers])
 
@@ -221,141 +292,150 @@ export default function App() {
   }, [preferredCelebration])
 
   useEffect(() => {
-    localStorage.setItem(TIMER_MODE_KEY, timerMode)
+    if (timerMode !== 'pomodoro') localStorage.setItem(TIMER_MODE_KEY, timerMode)
   }, [timerMode])
 
   useEffect(() => {
-    if (task.status !== 'completed' || !task.id) return
-    if (recordedCompletions.current.has(task.id)) return
-
-    recordedCompletions.current.add(task.id)
-
-    const completedAt = new Date()
-    const createdAt = task.createdAt ? new Date(task.createdAt) : null
+    if (task.status !== 'completed' || recordedTaskId.current === task.id || history.some(item => item.id === task.id)) return
+    recordedTaskId.current = task.id
+    const completedAtMs = task.stepCompletedAtMs.at(-1)
     const entry = {
       id: task.id,
       title: task.title,
       sections: task.sections,
-      createdAt: createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toISOString() : completedAt.toISOString(),
-      completedAt: completedAt.toISOString(),
-      durationMs: createdAt && !Number.isNaN(createdAt.getTime())
-        ? Math.max(0, completedAt.getTime() - createdAt.getTime())
-        : null,
-      celebration: task.celebration || lockedCelebration.current
+      createdAt: task.createdAt,
+      completedAt: new Date(completedAtMs).toISOString(),
+      stepCompletedAtMs: task.stepCompletedAtMs,
+      durationMs: completedAtMs - Date.parse(task.createdAt),
+      celebration: task.celebration
     }
 
-    setHistory(h => {
-      if (h.some(item => item.id === entry.id)) return h
-      return [entry, ...h].slice(0, HISTORY_MAX)
-    })
+    setHistory(current => [entry, ...current].slice(0, pomodoroSettings.historyLimit))
 
-    const effect = task.celebration || lockedCelebration.current
-    if (effect) {
-      playSound('taskComplete')
-        .then(() => playSound('celebrate'))
-        .then(() => playCelebration(effect, { emojis: emojiConfettiFillers }))
-    }
-  }, [task.status, task.id, task.title, task.sections, task.celebration, task.createdAt, emojiConfettiFillers])
+    playSound('taskComplete')
+      .then(() => playSound('celebrate'))
+      .then(() => playCelebration(task.celebration, { emojis: emojiConfettiFillers }))
+  }, [task, history, emojiConfettiFillers, pomodoroSettings.historyLimit])
 
   function updateTask(up) {
     setTask(t => {
       const allowedUpdate = { ...up }
       if (t.status !== 'idle') delete allowedUpdate.sections
 
-      const newTask = { ...t, ...allowedUpdate }
-      if (newTask.progress >= newTask.sections && t.status !== 'completed' && newTask.status === 'generated') {
-        newTask.status = 'completed'
+      return { ...t, ...allowedUpdate }
+    })
+  }
+
+  function completeTaskStep() {
+    if (task.status !== 'generated') return
+    playSound('spacePress')
+    const pressedAtMs = Date.now()
+    setTask(t => {
+      if (t.status !== 'generated' || t.progress >= t.sections) return t
+
+      const previousMs = t.stepCompletedAtMs.at(-1) ?? Date.parse(t.createdAt)
+      const completedAtMs = Math.max(pressedAtMs, previousMs)
+      const progress = t.progress + 1
+      return {
+        ...t,
+        progress,
+        status: progress === t.sections ? 'completed' : t.status,
+        stepCompletedAtMs: [...t.stepCompletedAtMs, completedAtMs]
       }
-      return newTask
     })
   }
 
   function selectCelebration(celebration) {
-    lockedCelebration.current = celebration
     setPreferredCelebration(celebration)
-    setShowEmojiSettings(false)
-    setShowHistory(false)
-    setShowManual(false)
-    setShowVolumeSettings(false)
-    setShowCelebrationRequired(false)
+    setPaperView(null)
     updateTask({ celebration })
   }
 
-  function toggleEmojiSettings() {
-    setShowHistory(false)
-    setShowManual(false)
-    setShowVolumeSettings(false)
-    setShowEmojiSettings(s => !s)
-  }
-
-  function toggleManual() {
-    setShowHistory(false)
-    setShowEmojiSettings(false)
-    setShowVolumeSettings(false)
-    setShowManual(s => !s)
-  }
-
-  function toggleVolumeSettings() {
-    setShowHistory(false)
-    setShowEmojiSettings(false)
-    setShowManual(false)
-    setShowVolumeSettings(s => !s)
+  function togglePaperView(view) {
+    setPaperView(current => current === view ? null : view)
   }
 
   function onGenerate() {
-    if (task.status !== 'idle') return
-
-    if (!task.celebration && !lockedCelebration.current) {
-      setShowEmojiSettings(false)
-      setShowHistory(false)
-      setShowManual(false)
-      setShowVolumeSettings(false)
-      setShowCelebrationRequired(true)
-      return
-    }
+    if (task.status !== 'idle' || generateTimeoutRef.current !== null) return
 
     playSound('generate')
-    setShowCelebrationRequired(false)
-
-    clearTimeout(generateTimeoutRef.current)
     generateTimeoutRef.current = setTimeout(() => {
+      generateTimeoutRef.current = null
+      const createdAt = new Date()
       setTask(t => ({
         ...t,
-        id: t.id || 'task-' + Date.now(),
+        id: 'task-' + createdAt.getTime(),
         status: 'generated',
-        createdAt: t.createdAt || new Date().toISOString()
+        createdAt: createdAt.toISOString()
       }))
     }, 500)
   }
 
   function onResetTask() {
     clearTimeout(generateTimeoutRef.current)
-    setTask({ id: null, title: '', sections: 10, progress: 0, status: 'idle', celebration: preferredCelebration, createdAt: null })
-    setShowEmojiSettings(false)
-    setShowHistory(false)
-    setShowManual(false)
-    setShowVolumeSettings(false)
-    setShowCelebrationRequired(false)
-    lockedCelebration.current = preferredCelebration
+    generateTimeoutRef.current = null
+    setTask(createIdleTask(pomodoroSettings.taskSections, preferredCelebration))
+    setPaperView(null)
   }
 
   function onSaveEmojiConfetti(nextEmojis) {
     const cleaned = nextEmojis.map(item => item.trim()).filter(Boolean)
     setEmojiConfettiFillers(cleaned.length ? cleaned : DEFAULT_EMOJI_CONFETTI)
-    setShowEmojiSettings(false)
+    setPaperView(null)
+  }
+
+  function savePomodoroSettings(settings) {
+    if (!validPomodoroMinutes(settings.focus) || !validPomodoroMinutes(settings.break) ||
+        !validTaskSections(settings.taskSections) || !HISTORY_LIMITS.includes(settings.historyLimit)) return
+    localStorage.setItem(POMODORO_KEY, JSON.stringify(settings))
+    if (settings.taskSections !== pomodoroSettings.taskSections) {
+      setTask(current => current.status === 'idle' ? { ...current, sections: settings.taskSections } : current)
+    }
+    setPomodoroSettings(settings)
+    setPaperView(null)
   }
 
   function selectTimerMode(mode) {
+    if (mode === 'pomodoro' && timerMode === mode) return
+    timerRef.current?.stop()
+    setPomodoroPhase(null)
     setTimerMode(mode)
-    setTimerRunning(false)
   }
 
-  function onToggleTimerKnob() {
-    if (timerRunning) {
-      timerRef.current?.reset()
+  function toggleDrawer() {
+    setCompactMode(value => !value)
+  }
+
+  async function toggleMinimalMode() {
+    if (switchingMinimalMode.current) return
+    switchingMinimalMode.current = true
+    const next = !minimalMode
+    try {
+      const desktop = window.cfsDesktop
+      setMinimalMode(desktop?.setMinimalMode ? await desktop.setMinimalMode(next) : next)
+    } finally {
+      switchingMinimalMode.current = false
+    }
+  }
+
+  function startTimer() {
+    if (timerMode === 'pomodoro') {
+      setPomodoroPhase(nextPomodoroPhase)
+      timerRef.current?.startPomodoro(nextPomodoroSeconds)
     } else {
       timerRef.current?.start()
     }
+  }
+
+  function onToggleTimerKnob() {
+    if (timerActive) timerRef.current?.reset()
+    else startTimer()
+  }
+
+  function toggleTimerPlayback() {
+    if (!timerActive) startTimer()
+    else if (timerRunning) timerRef.current?.pause()
+    else timerRef.current?.resume()
   }
 
   function suppressButtonKeyboard(event) {
@@ -375,12 +455,14 @@ export default function App() {
     desktop.toggleAlwaysOnTop().then(setAlwaysOnTop)
   }
 
-  function formatHistoryDate(value) {
+  function formatHistoryDate(value, includeSeconds = false) {
+    if (value == null || value === '') return '时间未记录'
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return String(value || '时间未记录').replace(/:\d{2}(?=\s|$)/, '')
 
     const pad = number => String(number).padStart(2, '0')
-    return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+    const minutes = `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+    return includeSeconds ? `${minutes}:${pad(date.getSeconds())}` : minutes
   }
 
   function formatHistoryDuration(durationMs) {
@@ -399,12 +481,22 @@ export default function App() {
     ].filter(Boolean).join('')
   }
 
-  async function exportHistory() {
-    const content = history.map(item => [
-      `${item.title || '无题任务'} ${item.sections ?? '-'}`,
-      formatHistoryDate(item.createdAt),
-      `用时 ${formatHistoryDuration(item.durationMs)}`
-    ].join('\r\n')).join('\r\n\r\n')
+  async function exportHistory(includeSteps) {
+    const content = history.map(item => {
+      const lines = [
+        `${item.title || '无题任务'} ${item.sections ?? '-'}`,
+        formatHistoryDate(item.createdAt),
+        `用时 ${formatHistoryDuration(item.durationMs)}`
+      ]
+      if (includeSteps) {
+        const steps = getHistorySteps(item)
+        if (!steps.length) lines.push('逐步用时未记录')
+        steps.forEach(({ time, duration }, index) => {
+          lines.push(`第 ${index + 1} 步：用时 ${formatStepDuration(duration)}，完成于 ${formatHistoryDate(time, true)}`)
+        })
+      }
+      return lines.join('\r\n')
+    }).join('\r\n\r\n')
     const now = new Date()
     const pad = number => String(number).padStart(2, '0')
     const fileName = `Click-for-Success-完成记录-${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}.txt`
@@ -424,8 +516,8 @@ export default function App() {
   }
 
   return (
-    <div className="app-root">
-      {window.cfsDesktop && RESIZE_EDGES.map(edge => (
+    <div className={`app-root${minimalMode ? ' app-root-minimal' : ''}`}>
+      {window.cfsDesktop && !minimalMode && RESIZE_EDGES.map(edge => (
         <div
           key={edge}
           className={`window-resize-handle window-resize-${edge}`}
@@ -433,7 +525,7 @@ export default function App() {
           onMouseDown={(event) => startWindowResize(edge, event)}
         />
       ))}
-      <div className={`printer ${compactMode ? 'printer-compact' : ''} ${showKeyHints ? 'printer-key-hints' : ''}`}>
+      <div className={`printer ${compactMode ? 'printer-compact' : ''} ${minimalMode ? 'printer-minimal' : ''} ${showKeyHints ? 'printer-key-hints' : ''}`}>
         <div className="rear-backplate" aria-hidden="true" />
         <div className="gold-arch gold-arch-left" aria-hidden="true" />
         <div className="gold-arch gold-arch-right" aria-hidden="true" />
@@ -443,20 +535,22 @@ export default function App() {
           className={`record-wheel ${compactMode ? 'record-wheel-retracted' : ''}`}
           aria-label={compactMode ? 'Expand keyboard' : 'Retract keyboard'}
           aria-pressed={compactMode}
+          title="抽屉模式（键盘映射：~）"
           onKeyDown={suppressButtonKeyboard}
-          onClick={() => setCompactMode(value => !value)}
+          onClick={toggleDrawer}
         />
         <button
           type="button"
-          className={`right-knob ${timerRunning ? 'timer-knob-running' : ''}`}
-          aria-label={timerRunning ? 'Reset timer' : 'Start timer'}
+          className={`right-knob ${timerActive ? 'timer-knob-running' : ''}`}
+          aria-label={timerActive ? '计时归零' : '开始计时'}
+          title="计时开关（键盘映射：Ctrl）"
           onKeyDown={suppressButtonKeyboard}
           onClick={onToggleTimerKnob}
         />
         {showKeyHints && (
           <>
-            <span className="mechanical-control-hint drawer-control-hint">抽屉模式</span>
-            <span className="mechanical-control-hint timer-control-hint">计时器开关</span>
+            <span className="mechanical-control-hint drawer-control-hint"><span>抽屉模式</span><span>~</span></span>
+            <span className="mechanical-control-hint timer-control-hint"><span>计时开关</span><span>ctrl</span></span>
           </>
         )}
         <div className="paper-bail" aria-hidden="true">
@@ -466,12 +560,16 @@ export default function App() {
         <Paper
           task={task}
           history={history}
-          showHistory={showHistory}
-          showEmojiSettings={showEmojiSettings}
-          showManual={showManual}
-          showVolumeSettings={showVolumeSettings}
+          showHistory={paperView === 'history'}
+          showEmojiSettings={paperView === 'emoji'}
+          showManual={paperView === 'manual'}
+          showVolumeSettings={paperView === 'volume'}
+          showPomodoroSettings={paperView === 'pomodoro'}
+          pomodoroSettings={pomodoroSettings}
+          maxPomodoroMinutes={MAX_POMODORO_MINUTES}
+          onSavePomodoroSettings={savePomodoroSettings}
+          onClosePomodoroSettings={() => setPaperView(null)}
           soundVolume={soundVolume}
-          showCelebrationRequired={showCelebrationRequired}
           emojiConfettiFillers={emojiConfettiFillers}
           onUpdate={updateTask}
           onSaveEmojiConfetti={onSaveEmojiConfetti}
@@ -481,14 +579,62 @@ export default function App() {
           formatHistoryDuration={formatHistoryDuration}
         />
         <div className="body">
-          <div className="logo">ClickforSuccess</div>
-          <div className="timer-area">
-            <Timer
-              ref={timerRef}
-              mode={timerMode}
-              running={timerRunning}
-              onRunningChange={setTimerRunning}
-            />
+          {minimalMode ? (
+            <div className="minimal-task">
+              <span className="minimal-task-title" title={task.title || undefined}>
+                {task.title || (task.status === 'idle' ? '暂无当前任务' : '无题任务')}
+              </span>
+              <button
+                type="button"
+                className="minimal-progress"
+                disabled={task.status !== 'generated'}
+                onClick={completeTaskStep}
+                aria-label={`任务进度 ${task.progress} / ${task.sections}${task.status === 'generated' ? '，点击完成一步' : ''}`}
+                title={task.status === 'generated' ? '完成一步' : undefined}
+              >
+                {task.progress}/{task.sections}
+              </button>
+            </div>
+          ) : (
+            <div className="logo">ClickforSuccess</div>
+          )}
+          <div className="timer-controls">
+            <div className="timer-button-control">
+              <button
+                type="button"
+                className="minimal-mode-toggle"
+                aria-label="极简模式"
+                aria-pressed={minimalMode}
+                title={minimalMode ? '恢复打字机' : '进入极简模式'}
+                onClick={event => {
+                  if (event.detail > 0) event.currentTarget.blur()
+                  toggleMinimalMode()
+                }}
+              />
+              {showKeyHints && <span className="mechanical-control-hint timer-button-hint minimal-mode-hint">极简模式</span>}
+            </div>
+            <div className="timer-area">
+              <Timer
+                ref={timerRef}
+                mode={timerMode}
+                status={timerStatus}
+                onStatusChange={setTimerStatus}
+                nextPomodoroSeconds={nextPomodoroSeconds}
+              />
+            </div>
+            <div className="timer-button-control">
+              <button
+                type="button"
+                className={`timer-pause-button${timerRunning ? ' is-running' : ''}`}
+                aria-label={timerPlaybackLabel}
+                title={`${timerPlaybackLabel}（键盘映射：Caps Lock）`}
+                onClick={event => {
+                  if (minimalMode && event.detail > 0) event.currentTarget.blur()
+                  toggleTimerPlayback()
+                }}
+              />
+              {showKeyHints && <span className="mechanical-control-hint timer-button-hint">Caps</span>}
+            </div>
           </div>
         </div>
 
@@ -546,23 +692,27 @@ export default function App() {
           </div>
           <Keyboard
             compactMode={compactMode}
+            minimalMode={minimalMode}
             showKeyHints={showKeyHints}
             task={task}
             onUpdate={updateTask}
+            onCompleteStep={completeTaskStep}
             onGenerate={onGenerate}
             onReset={onResetTask}
-            onToggleHistory={() => { setShowEmojiSettings(false); setShowManual(false); setShowHistory(s => !s) }}
-            onToggleManual={toggleManual}
-            onToggleVolume={toggleVolumeSettings}
-            onToggleEmojiSettings={toggleEmojiSettings}
+            onToggleHistory={() => togglePaperView('history')}
+            onToggleManual={() => togglePaperView('manual')}
+            onToggleVolume={() => togglePaperView('volume')}
+            onToggleEmojiSettings={() => togglePaperView('emoji')}
+            onTogglePomodoroSettings={() => togglePaperView('pomodoro')}
             onSelectCelebration={selectCelebration}
-            showEmojiSettings={showEmojiSettings}
-            showVolumeSettings={showVolumeSettings}
+            showEmojiSettings={paperView === 'emoji'}
+            showPomodoroSettings={paperView === 'pomodoro'}
             timerRef={timerRef}
             timerMode={timerMode}
+            onToggleTimer={onToggleTimerKnob}
+            onToggleTimerPlayback={toggleTimerPlayback}
+            onToggleDrawer={toggleDrawer}
             onSelectTimerMode={selectTimerMode}
-            soundVolume={soundVolume}
-            onChangeSoundVolume={setSoundVolumeState}
           />
         </div>
       </div>

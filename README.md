@@ -6,14 +6,14 @@
 
 ## 下载
 
-- [Windows 安装版 v2.0.0](https://github.com/dulceluna93/click-for-success/releases/download/v2.0.0/Click.for.Success.Setup.2.0.0.exe)
-- [Windows 便携版 v2.0.0](https://github.com/dulceluna93/click-for-success/releases/download/v2.0.0/Click.for.Success.2.0.0.exe)
-- [macOS 通用版 v2.0.0](https://github.com/dulceluna93/click-for-success/releases/download/v2.0.0/Click.for.Success-2.0.0-mac-universal.dmg)（Intel 和 Apple Silicon）
+- [Windows 安装版 v2.1.0](https://github.com/dulceluna93/click-for-success/releases/download/v2.1.0/Click.for.Success.Setup.2.1.0.exe)
+- [Windows 便携版 v2.1.0](https://github.com/dulceluna93/click-for-success/releases/download/v2.1.0/Click.for.Success.2.1.0.exe)
+- [macOS 通用版 v2.1.0](https://github.com/dulceluna93/click-for-success/releases/download/v2.1.0/Click.for.Success-2.1.0-mac-universal.dmg)（Intel 和 Apple Silicon）
 - [查看最新发布说明](https://github.com/dulceluna93/click-for-success/releases/latest) · [查看所有版本](https://github.com/dulceluna93/click-for-success/releases)
 
 macOS 版本由 GitHub Actions 构建，尚未在真实 Mac 上测试，也未进行 Apple 代码签名或公证。
 
-## 2.0 主要功能
+## 主要功能
 
 - 桌宠式透明窗口，可拖动、置顶并从四边或四角缩放。
 - 窗口可缩小至 `180 x 135`，打字机会随窗口完整等比缩放。
@@ -37,6 +37,8 @@ macOS 版本由 GitHub Actions 构建，尚未在真实 Mac 上测试，也未�
 6. 达到总数后，应用播放完成反馈并自动写入历史记录。
 7. 点击 `SET` 重置任务并开始下一项。
 
+新任务默认有 5 步。点击 `W` 打开「快速设置」，可修改「默认任务步骤」。设置会保存在本机，已生成的任务继续使用原来的步骤数。
+
 任务生成后，划分数量不能再修改；`1`、`2` 仍保留按键动画，但不会改变数据。
 
 ## 打字机按键
@@ -51,7 +53,7 @@ macOS 版本由 GitHub Actions 构建，尚未在真实 Mac 上测试，也未�
 | `U` | 计时器增加 10 分钟 | `U` |
 | `I` | 计时器减少 1 分钟 | `I` |
 | `O` | 选择正计时 | `O` |
-| `P` | 选择倒计时 | `P` |
+| `P` | 选择手动倒计时 | `P` |
 | `Z` | 开关电脑键盘映射 | `Z`（关闭映射） |
 | `,` | 音量设置 | `,` |
 | `.` | 内置说明书 | `.` |
@@ -64,16 +66,30 @@ macOS 版本由 GitHub Actions 构建，尚未在真实 Mac 上测试，也未�
 
 在任务名称、表情或数字输入框中输入时，映射按键只显示视觉效果，不执行功能。任务名称输入框中的 `Enter` 是例外，可直接生成任务；输入法正在选词时不会触发生成。
 
+## 快速番茄钟
+
+按 `Q` 选中快速番茄钟并显示专注时长，默认 25 分钟。点击计时器旁的圆钮或右上方机械开关开始计时。计时结束后，屏幕显示下一轮的时长，默认先休息 5 分钟，再回到专注。番茄钟时长通过 `W` 设置。
+
+`Q`、`O`、`P` 分别对应快速番茄钟、正计时和手动倒计时，一次只选中一个。在 `O` 或 `P` 模式下，停表时可点击数字编辑小时、分钟和秒。键盘映射开启时，输入会保留键帽动画，单按 `Ctrl` 仍可开始计时。
+
 ## 机械控制与窗口
 
-- 左上角圆盘：切换抽屉模式。
-- 右上方机械开关：开始计时；计时运行中再次点击会归零。
+- 左上角圆盘：切换抽屉模式。开启键盘映射后，也可以按 `~`。
+- 点击计时器左侧的三个金点：进入或退出极简模式。
+- 右上方机械开关：开始计时或结束当前计时。开启键盘映射后，也可以单按 `Ctrl`。
+- 计时器旁的圆钮：开始、暂停或继续计时。开启键盘映射后，在输入框外按 `Caps Lock` 也可以。
 - `?` 便签：显示或隐藏中文按键提示。
 - `Pin`：切换窗口置顶。
 - `Min`：最小化窗口。
 - `X`：关闭窗口。
 - 打字机的非交互表面可用于拖动窗口。
 - 窗口四边和四角均可调整尺寸。
+
+### 极简模式
+
+极简模式只保留机身横条，左侧显示当前任务名称和进度，右侧显示计时器与开始、暂停、继续按钮。点击进度数字可完成一步。若已开启键盘映射，仍可用空格推进任务、用 `Caps Lock` 开始或暂停计时、用 `Ctrl` 开始或结束计时。
+
+桌面版会将横条放到当前屏幕底部，可以拖动横条调整位置。再次点击三个金点会恢复原来的窗口大小、位置和打字机布局。任务和计时在切换时会保留。
 
 ## 历史记录与导出
 
@@ -87,15 +103,37 @@ macOS 版本由 GitHub Actions 构建，尚未在真实 Mac 上测试，也未�
 
 历史时间精确到分钟。旧版本记录如果缺少真实开始时间，会显示“用时 未记录”。
 
-点击 `HISTORY` 标题旁的下载图标，确认后即可导出完成记录：
+点击 `HISTORY` 旁的「详细模式」，可以查看每一步的用时。条形按各步耗时的比例分段，步骤总数显示在右侧；下方的用时明细会自动换行。第一步从任务生成时开始计时，之后每一步从上一次推进进度时开始计时。旧记录会显示「逐步用时未记录」。
+
+点击 `HISTORY` 标题旁的下载图标，确认后即可导出完成记录。勾选「包含每一步用时」时，TXT 会写入各步的耗时和完成时间，精确到秒。
 
 - 浏览器预览会直接下载 TXT。
 - Electron 桌面版会打开系统“另存为”窗口。
 - 文件采用带 BOM 的 UTF-8 编码，便于 Windows 记事本正确显示中文。
 
+历史默认保留最近 200 条，可在 `W`「快速设置」中选择保留 50、200 或 500 条。调低上限后，下一次完成任务时会移除超出上限的最旧记录。
+
 ## 本地数据
 
-历史记录、音量、庆祝方式、礼花表情和计时模式保存在应用本地。键盘映射模式不会持久化，刷新或重新启动后默认关闭。
+当前任务、已完成的步骤和对应时间会自动保存在本机，重开应用后可以接着做。任务历史按从生成到完成的实际时间记录，包含应用关闭的间隔。
+
+历史记录、音量、庆祝方式、礼花表情和计时模式也会保存在应用本地。首次使用的音量为 3 / 5，可以设为静音。键盘映射模式在刷新或重开后默认关闭。
+
+## 更换彩带动画
+
+彩带动画集中在 [`src/celebrations/confetti.js`](src/celebrations/confetti.js)。在源码目录里备份旧文件，再用新文件覆盖同一路径即可。保留文件名和 `export function confetti()` 这个入口，应用完成任务时会自动调用它。
+
+例如，用项目已有的 `canvas-confetti` 做一个单点喷射，可以把整个文件替换为：
+
+```js
+import launchConfetti from 'canvas-confetti'
+
+export function confetti() {
+  launchConfetti({ particleCount: 100, spread: 70, origin: { y: 0.8 } })
+}
+```
+
+只想调整现有动画时，可以改同一个文件里的 `CANNONS`（喷射位置与角度）或 `BURSTS`（扩散范围与速度）。保存后运行 `npm run dev`，点 `+` 选择彩带并完成一个任务，即可预览。要在已安装的桌面版里使用新动画，从源码重新打包并安装，命令见下方。
 
 ## 从源码运行
 

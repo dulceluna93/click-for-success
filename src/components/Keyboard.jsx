@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from 'react'
-import { playSound } from '../sounds'
+import React, { useEffect, useRef, useState } from 'react'
 
 function suppressKeyboardActivation(event) {
   if (event.key === ' ' || event.key === 'Enter') {
@@ -9,6 +8,8 @@ function suppressKeyboardActivation(event) {
 }
 
 const KEY_HINTS = {
+  Q: '🍅',
+  W: '设置',
   U: '+10min',
   I: '-1min',
   O: '正计时',
@@ -35,7 +36,17 @@ function getTypewriterKey(code) {
   return TYPEWRITER_LETTERS.has(letter) ? letter : null
 }
 
-function Key({ label, hint, showKeyHints = false, active = false, physicallyPressed = false, disabled = false, onClick, className = '' }) {
+function isTextEntry(target) {
+  return target instanceof HTMLElement && Boolean(target.closest('input, select, textarea, [contenteditable="true"]'))
+}
+
+function allowsTimerShortcut(target) {
+  return !isTextEntry(target) || target.matches('.timer-input')
+}
+
+const TIMER_MODE_KEYS = { Q: 'pomodoro', O: 'up', P: 'down' }
+
+function Key({ label, hint, showKeyHints = false, active = false, pressed, physicallyPressed = false, disabled = false, onClick, className = '' }) {
   const hasHint = Boolean(hint)
   const hasTwoCharacterHint = /^[\u4e00-\u9fff]{2}$/.test(hint || '')
   const displayLabel = showKeyHints && hasHint ? hint : label
@@ -48,6 +59,7 @@ function Key({ label, hint, showKeyHints = false, active = false, physicallyPres
       onClick={onClick}
       onKeyDown={suppressKeyboardActivation}
       aria-label={showKeyHints && hasHint ? `${label}：${hint}` : label}
+      aria-pressed={pressed}
     >
       {displayLabel}
     </button>
@@ -57,35 +69,48 @@ function Key({ label, hint, showKeyHints = false, active = false, physicallyPres
 export default function Keyboard({
   task,
   onUpdate,
+  onCompleteStep,
   onGenerate,
   onReset,
   onToggleHistory,
   onToggleManual,
   onToggleVolume,
   onToggleEmojiSettings,
+  onTogglePomodoroSettings,
+  showPomodoroSettings,
   onSelectCelebration,
   showEmojiSettings,
   timerRef,
   timerMode,
   onSelectTimerMode,
+  onToggleTimer,
+  onToggleTimerPlayback,
+  onToggleDrawer,
   showKeyHints = false,
-  compactMode = false
+  compactMode = false,
+  minimalMode = false
 }) {
   const [mappingMode, setMappingMode] = useState(false)
   const [pressedKeys, setPressedKeys] = useState(() => new Set())
+  const pendingModifier = useRef(null)
+  const timerActions = {
+    Q: () => onSelectTimerMode('pomodoro'),
+    W: onTogglePomodoroSettings,
+    U: () => timerRef.current?.addTenMinutes(),
+    I: () => timerRef.current?.subOneMinute(),
+    O: () => onSelectTimerMode('up'),
+    P: () => onSelectTimerMode('down')
+  }
 
   function updateSections(delta) {
     if (task.status !== 'idle') return
     onUpdate({ sections: Math.max(1, task.sections + delta) })
   }
 
-  function completeProgress() {
-    if (task.status !== 'generated') return
-
-    playSound('spacePress')
-    onUpdate({
-      progress: Math.min(task.sections, task.progress + 1)
-    })
+  function stopMapping() {
+    pendingModifier.current = null
+    setMappingMode(false)
+    setPressedKeys(new Set())
   }
 
   function runMappedAction(key) {
@@ -95,18 +120,12 @@ export default function Keyboard({
       '0': onToggleEmojiSettings,
       '-': () => onSelectCelebration('emojiConfetti'),
       '+': () => onSelectCelebration('confetti'),
-      U: () => timerRef.current?.addTenMinutes(),
-      I: () => timerRef.current?.subOneMinute(),
-      O: () => onSelectTimerMode('up'),
-      P: () => onSelectTimerMode('down'),
-      Z: () => {
-        setMappingMode(false)
-        setPressedKeys(new Set())
-      },
+      ...timerActions,
+      Z: stopMapping,
       ',': onToggleVolume,
       '.': onToggleManual,
       '/': onToggleHistory,
-      Space: completeProgress,
+      Space: onCompleteStep,
       CL: onGenerate,
       SET: onReset
     }
@@ -117,22 +136,46 @@ export default function Keyboard({
   useEffect(() => {
     if (!mappingMode) return undefined
 
+    function pressKey(key) {
+      setPressedKeys(current => current.has(key) ? current : new Set([...current, key]))
+    }
+
     function handlePhysicalKey(event) {
+      const target = event.target
+      const isEditing = isTextEntry(target)
+      if (event.key === 'Control' || event.key === 'Shift') {
+        if (!event.repeat) {
+          const isCtrl = event.key === 'Control'
+          const canActivate = isCtrl ? allowsTimerShortcut(target) && !event.shiftKey : !minimalMode && !isEditing && !event.ctrlKey
+          pendingModifier.current = !pendingModifier.current && canActivate && !event.altKey && !event.metaKey && !event.isComposing
+            ? event.code
+            : null
+          if (!isCtrl) pressKey('SET')
+        }
+        return
+      }
+
+      pendingModifier.current = null
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      if (event.code === 'CapsLock') {
+        if (!isEditing && !event.isComposing && !event.shiftKey && !event.repeat) {
+          onToggleTimerPlayback()
+        }
+        return
+      }
+      if (!minimalMode && event.key === '~' && !isEditing && !event.isComposing) {
+        event.preventDefault()
+        if (!event.repeat) onToggleDrawer()
+        return
+      }
       const key = getTypewriterKey(event.code)
       if (!key) return
+      if (minimalMode && key !== 'Space' && key !== 'Z') return
 
-      setPressedKeys(current => {
-        if (current.has(key)) return current
-        const next = new Set(current)
-        next.add(key)
-        return next
-      })
+      if ((key === 'Space' || key === 'CL') && event.target instanceof HTMLElement &&
+          event.target.closest('.history-export-dialog, .history-export-button, .history-detail-toggle, .pomodoro-settings button, .timer-pause-button, .minimal-mode-toggle, .minimal-progress')) return
 
-      const target = event.target
-      const isEditing = target instanceof HTMLElement && (
-        target.matches('input, textarea, [contenteditable="true"]') ||
-        Boolean(target.closest('input, textarea, [contenteditable="true"]'))
-      )
+      pressKey(key)
 
       if (event.isComposing || event.repeat) return
 
@@ -149,6 +192,15 @@ export default function Keyboard({
     }
 
     function handlePhysicalKeyUp(event) {
+      if (event.key === 'Control' || event.key === 'Shift') {
+        const isStandalone = pendingModifier.current === event.code && !event.isComposing
+        pendingModifier.current = null
+        if (event.key === 'Control') {
+          if (isStandalone && allowsTimerShortcut(event.target)) onToggleTimer()
+          return
+        }
+        if (isStandalone && !isTextEntry(event.target)) runMappedAction('SET')
+      }
       const key = getTypewriterKey(event.code)
       if (!key) return
 
@@ -161,6 +213,7 @@ export default function Keyboard({
     }
 
     function clearPhysicalKeys() {
+      pendingModifier.current = null
       setPressedKeys(new Set())
     }
 
@@ -175,13 +228,6 @@ export default function Keyboard({
   })
 
   function renderLetterRow() {
-    const actions = {
-      U: () => timerRef.current?.addTenMinutes(),
-      I: () => timerRef.current?.subOneMinute(),
-      O: () => onSelectTimerMode('up'),
-      P: () => onSelectTimerMode('down')
-    }
-
     return ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P'].map(label => (
       <Key
         key={label}
@@ -189,9 +235,10 @@ export default function Keyboard({
         hint={KEY_HINTS[label]}
         showKeyHints={showKeyHints}
         physicallyPressed={pressedKeys.has(label)}
-        onClick={actions[label] || (() => {})}
-        active={(label === 'O' && timerMode === 'up') || (label === 'P' && timerMode === 'down')}
-        className={actions[label] ? 'key-functional' : ''}
+        onClick={timerActions[label]}
+        active={(label === 'W' && showPomodoroSettings) || TIMER_MODE_KEYS[label] === timerMode}
+        pressed={TIMER_MODE_KEYS[label] ? TIMER_MODE_KEYS[label] === timerMode : undefined}
+        className={timerActions[label] ? 'key-functional' : ''}
       />
     ))
   }
@@ -239,17 +286,17 @@ export default function Keyboard({
                 physicallyPressed={pressedKeys.has('Z')}
                 active={mappingMode}
                 className="key-functional"
-                onClick={() => setMappingMode(value => {
-                  if (value) setPressedKeys(new Set())
-                  return !value
-                })}
+                onClick={() => {
+                  if (mappingMode) stopMapping()
+                  else setMappingMode(true)
+                }}
               />
             )
           }
           if (label === ',') return <Key key="," label="," hint="音量" showKeyHints={showKeyHints} physicallyPressed={pressedKeys.has(',')} className="key-functional" onClick={onToggleVolume} />
           if (label === '.') return <Key key="." label="." hint="说明" showKeyHints={showKeyHints} physicallyPressed={pressedKeys.has('.')} className="key-functional" onClick={onToggleManual} />
           if (label === '/') return <Key key="/" label="/" hint="记录" showKeyHints={showKeyHints} physicallyPressed={pressedKeys.has('/')} className="key-functional" onClick={onToggleHistory} />
-          return <Key key={label} label={label} showKeyHints={showKeyHints} physicallyPressed={pressedKeys.has(label)} onClick={() => {}} />
+          return <Key key={label} label={label} showKeyHints={showKeyHints} physicallyPressed={pressedKeys.has(label)} />
         })}
       </div>
 
@@ -258,7 +305,7 @@ export default function Keyboard({
           type="button"
           onKeyDown={suppressKeyboardActivation}
           className={`space key-functional ${showKeyHints ? 'space-hint' : ''} ${pressedKeys.has('Space') ? 'space-physically-pressed' : ''}`}
-          onClick={completeProgress}
+          onClick={onCompleteStep}
         >
           {showKeyHints ? '进度+1' : 'Space'}
         </button>

@@ -1,6 +1,6 @@
 {
   "name": "click-for-success",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "A typewriter-style desktop task progress tracker.",
   "author": "dulceluna93",
   "private": true,
@@ -14,6 +14,7 @@
     "dist:mac": "npm run build && electron-builder --mac dmg --universal --publish never"
   },
   "dependencies": {
+    "canvas-confetti": "1.9.4",
     "js-confetti": "^0.13.1",
     "react": "18.2.0",
     "react-dom": "18.2.0"

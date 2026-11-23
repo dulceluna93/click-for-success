@@ -1,10 +1,15 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain, screen } = require('electron')
 const fs = require('fs/promises')
 const path = require('path')
 
 let mainWindow = null
+let fullWindowBounds = null
+const MINIMAL_WIDTH = 430
+const MINIMAL_HEIGHT = 88
+const MINIMAL_MARGIN = 16
 
 function createWindow() {
+  fullWindowBounds = null
   mainWindow = new BrowserWindow({
     width: 1050,
     height: 594,
@@ -63,6 +68,28 @@ ipcMain.handle('desktop:set-ignore-mouse-events', (_event, ignore) => {
 
 ipcMain.handle('desktop:get-window-bounds', () => {
   return mainWindow?.getBounds() ?? null
+})
+
+ipcMain.handle('desktop:set-minimal-mode', (_event, enabled) => {
+  if (!mainWindow) return false
+  if (enabled && !fullWindowBounds) {
+    fullWindowBounds = mainWindow.getBounds()
+    const { x, y, width, height } = screen.getDisplayMatching(fullWindowBounds).workArea
+    const stripWidth = Math.min(MINIMAL_WIDTH, width)
+    mainWindow.setMinimumSize(stripWidth, MINIMAL_HEIGHT)
+    mainWindow.setBounds({
+      x: x + Math.round((width - stripWidth) / 2),
+      y: y + height - MINIMAL_HEIGHT - MINIMAL_MARGIN,
+      width: stripWidth,
+      height: MINIMAL_HEIGHT
+    })
+  } else if (!enabled && fullWindowBounds) {
+    mainWindow.setMinimumSize(180, 135)
+    mainWindow.setBounds(fullWindowBounds)
+    fullWindowBounds = null
+  }
+
+  return Boolean(fullWindowBounds)
 })
 
 ipcMain.handle('desktop:set-window-bounds', (_event, nextBounds) => {

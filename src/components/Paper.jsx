@@ -1,4 +1,79 @@
 import React, { useEffect, useState } from 'react'
+import { formatStepDuration, getHistorySteps, HISTORY_LIMITS } from '../history'
+
+function HistoryTimeline({ entry }) {
+  const steps = getHistorySteps(entry)
+  const hasElapsedTime = steps.some(({ duration }) => duration > 0)
+
+  return (
+    <div className="history-timeline">
+      <div className="history-timeline-row">
+        <div className="history-timeline-track" aria-hidden="true">
+          {steps.map(({ duration }, index) => (
+            <span key={index} style={{ flexGrow: hasElapsedTime ? duration : 1 }} />
+          ))}
+        </div>
+        <span className="hist-sections">{entry.sections ?? '-'} 步</span>
+      </div>
+      {steps.length ? (
+        <ol className="history-step-list" aria-label="各步用时">
+          {steps.map(({ time, duration }, index) => (
+            <li key={index} title={`完成于 ${new Date(time).toLocaleString()}`}>
+              第 {index + 1} 步 · {formatStepDuration(duration)}
+            </li>
+          ))}
+        </ol>
+      ) : (
+        <div className="hist-meta">逐步用时未记录</div>
+      )}
+    </div>
+  )
+}
+
+function PomodoroSettings({ settings, maxMinutes, onSave, onClose }) {
+  function save(event) {
+    event.preventDefault()
+    const fields = new FormData(event.currentTarget)
+    onSave({
+      focus: Number(fields.get('focus')),
+      break: Number(fields.get('break')),
+      taskSections: Number(fields.get('taskSections')),
+      historyLimit: Number(fields.get('historyLimit'))
+    })
+  }
+
+  return (
+    <form className="pomodoro-settings" onSubmit={save}>
+      <h3>⚙️ 快速设置</h3>
+      <label>
+        <span>专注时长</span>
+        <input name="focus" type="number" min="1" max={maxMinutes} step="1" required defaultValue={settings.focus} />
+        <span className="settings-unit">分钟</span>
+      </label>
+      <label>
+        <span>休息时长</span>
+        <input name="break" type="number" min="1" max={maxMinutes} step="1" required defaultValue={settings.break} />
+        <span className="settings-unit">分钟</span>
+      </label>
+      <label>
+        <span>默认任务步骤</span>
+        <input name="taskSections" type="number" min="1" max={Number.MAX_SAFE_INTEGER} step="1" required defaultValue={settings.taskSections} />
+        <span className="settings-unit">步</span>
+      </label>
+      <label title="调低上限后，下一次完成任务时会移除超出上限的最旧记录">
+        <span>历史保留</span>
+        <select name="historyLimit" defaultValue={settings.historyLimit}>
+          {HISTORY_LIMITS.map(limit => <option value={limit} key={limit}>{limit}</option>)}
+        </select>
+        <span className="settings-unit">条 <small>· 保留最新记录</small></span>
+      </label>
+      <div className="pomodoro-settings-actions">
+        <button type="button" onClick={onClose}>取消</button>
+        <button type="submit">保存</button>
+      </div>
+    </form>
+  )
+}
 
 export default function Paper({
   task,
@@ -7,8 +82,12 @@ export default function Paper({
   showEmojiSettings,
   showManual,
   showVolumeSettings,
+  showPomodoroSettings,
+  pomodoroSettings,
+  maxPomodoroMinutes,
+  onSavePomodoroSettings,
+  onClosePomodoroSettings,
   soundVolume,
-  showCelebrationRequired,
   emojiConfettiFillers,
   onUpdate,
   onSaveEmojiConfetti,
@@ -17,12 +96,14 @@ export default function Paper({
   formatHistoryDate,
   formatHistoryDuration
 }) {
-  const isEditing = task.status === 'idle' && !showHistory && !showEmojiSettings && !showManual && !showVolumeSettings
+  const isEditing = task.status === 'idle' && !showHistory && !showEmojiSettings && !showManual && !showVolumeSettings && !showPomodoroSettings
   const paperState = isEditing ? 'paper-collapsed' : 'paper-expanded'
   const [draftEmojis, setDraftEmojis] = useState(emojiConfettiFillers)
   const [isEditingSections, setIsEditingSections] = useState(false)
   const [sectionsDraft, setSectionsDraft] = useState(String(task.sections))
   const [showExportConfirm, setShowExportConfirm] = useState(false)
+  const [exportSteps, setExportSteps] = useState(false)
+  const [showHistoryDetails, setShowHistoryDetails] = useState(false)
 
   useEffect(() => {
     if (showEmojiSettings) {
@@ -43,7 +124,7 @@ export default function Paper({
     emojiConfetti: '☆',
     confetti: '✦'
   }
-  const celebrationMark = celebrationMarks[task.celebration] || (showCelebrationRequired ? '?' : null)
+  const celebrationMark = celebrationMarks[task.celebration]
 
   function updateDraft(index, value) {
     setDraftEmojis(current => {
@@ -113,11 +194,15 @@ export default function Paper({
             </div>
             <div className="manual-section-title">计时器功能：</div>
             <div className="manual-list">
+              <div><span className="manual-key">Q：</span>选中番茄钟，按计时开关开始；</div>
+              <div><span className="manual-key">W：</span>快速设置，可修改番茄钟时长和默认任务步骤；</div>
               <div><span className="manual-key">U：</span>增加10min；</div>
               <div><span className="manual-key">I：</span>减少1min；</div>
               <div><span className="manual-key">O：</span>正计时；</div>
-              <div><span className="manual-key">P：</span>倒计时；</div>
-              <div><span className="manual-key">右上方按键：</span>开始计时/归零；</div>
+              <div><span className="manual-key">P：</span>手动倒计时；</div>
+              <div><span className="manual-key">计时数字：</span>O / P 停止时可直接输入时、分、秒；</div>
+              <div><span className="manual-key">右上方按键 / Ctrl：</span>开始计时或结束当前计时；</div>
+              <div><span className="manual-key">计时器旁的圆钮 / Caps Lock：</span>开始、暂停或继续计时；</div>
             </div>
             <div className="manual-section-title">其他按键：</div>
             <div className="manual-list">
@@ -127,10 +212,18 @@ export default function Paper({
               <div><span className="manual-key">"."：</span>说明书；</div>
               <div><span className="manual-key">"/"：</span>历史记录及TXT导出；</div>
               <div><span className="manual-key">"?"便签：</span>显示按键提示；</div>
-              <div><span className="manual-key">左上角圆盘：</span>切换抽屉模式；</div>
+              <div><span className="manual-key">左上角圆盘 / ~：</span>切换抽屉模式；</div>
+              <div><span className="manual-key">计时器左侧三个金点：</span>点击切换极简模式；</div>
               <div><span className="manual-key">Pin / Min / X：</span>置顶/最小化/关闭；</div>
             </div>
           </div>
+        ) : showPomodoroSettings ? (
+          <PomodoroSettings
+            settings={pomodoroSettings}
+            maxMinutes={maxPomodoroMinutes}
+            onSave={onSavePomodoroSettings}
+            onClose={onClosePomodoroSettings}
+          />
         ) : showVolumeSettings ? (
           <div className="volume-view">
             <h3>音量设置</h3>
@@ -159,17 +252,32 @@ export default function Paper({
                 aria-label="导出完成记录"
                 title="导出完成记录"
                 disabled={history.length === 0}
-                onClick={() => setShowExportConfirm(true)}
+                onClick={() => {
+                  setExportSteps(showHistoryDetails)
+                  setShowExportConfirm(true)
+                }}
               >
                 <span className="history-export-icon" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="history-detail-toggle"
+                aria-pressed={showHistoryDetails}
+                onClick={() => setShowHistoryDetails(current => !current)}
+              >
+                详细模式
               </button>
             </div>
             <div className="history-list">
               {history.length === 0 && <div className="hint">暂无记录</div>}
               {history.map(h => (
                 <div className="history-item" key={h.id}>
-                  <div className="hist-title">{h.title || '无题任务'} <span className="hist-sections">{h.sections ?? '-'}</span></div>
+                  <div className="hist-title">
+                    {h.title || '无题任务'}
+                    {!showHistoryDetails && <> <span className="hist-sections">{h.sections ?? '-'}</span></>}
+                  </div>
                   <div className="hist-meta">{formatHistoryDate(h.createdAt)}</div>
+                  {showHistoryDetails && <HistoryTimeline entry={h} />}
                   <div className="hist-duration">用时 {formatHistoryDuration(h.durationMs)}</div>
                   <div className="divider">------------------</div>
                 </div>
@@ -179,6 +287,10 @@ export default function Paper({
               <div className="history-export-backdrop">
                 <div className="history-export-dialog" role="dialog" aria-modal="true" aria-labelledby="history-export-title">
                   <div id="history-export-title" className="history-export-title">是否导出完成记录？</div>
+                  <label className="history-export-option">
+                    <input type="checkbox" checked={exportSteps} onChange={event => setExportSteps(event.target.checked)} />
+                    包含每一步用时
+                  </label>
                   <div className="history-export-actions">
                     <button type="button" onClick={() => setShowExportConfirm(false)}>取消</button>
                     <button
@@ -186,7 +298,7 @@ export default function Paper({
                       className="history-export-confirm"
                       onClick={() => {
                         setShowExportConfirm(false)
-                        onExportHistory()
+                        onExportHistory(exportSteps)
                       }}
                     >
                       导出

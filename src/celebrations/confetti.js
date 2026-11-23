@@ -1,30 +1,36 @@
-export function confetti(){
-  const cvs = document.createElement('canvas')
-  cvs.style.position='fixed'
-  cvs.style.left='0'
-  cvs.style.top='0'
-  cvs.width = window.innerWidth
-  cvs.height = window.innerHeight
-  cvs.style.pointerEvents='none'
-  document.body.appendChild(cvs)
-  const ctx = cvs.getContext('2d')
-  const pieces = []
-  for(let i=0;i<200;i++){
-    pieces.push({x:Math.random()*cvs.width,y:Math.random()*-cvs.height, vx:(Math.random()-0.5)*4, vy:Math.random()*3+2, size: (Math.random()*8)+4, color: `hsl(${Math.random()*360}deg 70% 60%)` })
-  }
-  let t=0
-  function draw(){
-    t+=1
-    ctx.clearRect(0,0,cvs.width,cvs.height)
-    for(const p of pieces){
-      p.x += p.vx
-      p.y += p.vy
-      p.vy += 0.05
-      ctx.fillStyle = p.color
-      ctx.fillRect(p.x,p.y,p.size,p.size*0.6)
+import launchConfetti from 'canvas-confetti'
+
+// Launch pattern adapted from Toby Smith's Confetti Cannon (ISC).
+// See public/third-party-notices.txt.
+const CANNONS = [
+  { x: 0, angle: 45 },
+  { x: 0.5, angle: 90 },
+  { x: 1, angle: 135 }
+]
+
+const BURSTS = [
+  { share: 0.25, spread: 26, velocity: 100, decay: 0.9 },
+  { share: 0.2, spread: 60, velocity: 45, decay: 0.9 },
+  { share: 0.35, spread: 100, velocity: 45, decay: 0.91 },
+  { share: 0.1, spread: 120, velocity: 50, decay: 0.92 },
+  { share: 0.1, spread: 120, velocity: 90, decay: 0.9 }
+]
+
+export function confetti() {
+  const countPerCannon = Math.min(160, Math.max(50, Math.round(window.innerWidth / 7)))
+  const velocityScale = Math.min(1, Math.max(0.38, Math.sqrt(window.innerHeight / 900)))
+
+  for (const { x, angle } of CANNONS) {
+    for (const { share, spread, velocity, decay } of BURSTS) {
+      launchConfetti({
+        origin: { x, y: 1 },
+        angle,
+        particleCount: Math.round(countPerCannon * share),
+        spread,
+        startVelocity: velocity * velocityScale,
+        decay,
+        disableForReducedMotion: true
+      })
     }
-    if(t<300) requestAnimationFrame(draw)
-    else document.body.removeChild(cvs)
   }
-  draw()
 }
